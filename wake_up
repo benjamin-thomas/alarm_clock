@@ -1,0 +1,71 @@
+#!/usr/bin/env ruby
+
+# http://stackoverflow.com/questions/4136248/how-to-generate-a-human-readable-time-range-using-ruby-on-rails
+def humanize secs
+  [[60, :seconds], [60, :minutes], [24, :hours], [1000, :days]].map{ |count, name|
+    if secs > 0
+      secs, n = secs.divmod(count)
+      "#{n.to_i} #{name}"
+    end
+  }.compact.reverse.join(' ')
+end
+
+require 'optparse'
+
+DEFAULT_SNOOZE = 10
+Options = Struct.new(:snooze)
+
+options = Options.new
+options.snooze = DEFAULT_SNOOZE
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{File.basename($0)} [options] HH:MM"
+
+  opts.on("-s", "--snooze SEC (default = #{DEFAULT_SNOOZE})", Float) do |s|
+    options.snooze = s
+  end
+end.parse!
+
+if `which espeak`.empty?
+  warn "\n[\033[1;31mFAIL\033[0;m] Missing package: 'espeak'"
+  exit 1
+end
+
+if ARGV[0].nil? || !ARGV[0].include?(':')
+  exec "#{$0} -h"
+end
+
+h, m = ARGV[0].split(':')
+start = Time.now
+target = Time.new(start.year, start.month, start.day, h, m)
+
+if start > target
+  target += 1*60**2*24
+end
+
+puts "Will wake up at: #{target}\n\n"
+PADDING = ' ' * 30
+
+loop do
+  sleep 1
+  now = Time.now
+  remaining = target - now
+  overdue = remaining * -1
+
+  if overdue > 0
+    print "[\033[1;31mOVERDUE\033[0;m] #{humanize(overdue)} (#{Integer(overdue)}s)#{PADDING}\r"
+    system(%Q^espeak "Time to wake up! It's #{now.hour} hours and #{now.min} minutes" 2>/dev/null^)
+
+    remaining_snooze = options.snooze
+    loop do
+      break if remaining_snooze <= 0
+      print "[\033[1;33mSNOOZING\033[0;m] #{humanize(remaining_snooze)} (#{Integer(remaining_snooze)}s)#{PADDING}\r"
+      remaining_snooze -= 1
+      sleep 1
+    end
+
+    next
+  end
+
+  printf "[\033[1;32mREMAINING\033[0;m] %s (%ds)#{' ' * 30}\r", humanize(remaining), remaining
+end
