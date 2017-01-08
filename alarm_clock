@@ -13,16 +13,22 @@ end
 require 'optparse'
 
 DEFAULT_SNOOZE = 10
-Options = Struct.new(:snooze)
+DEFAULT_MESSAGE = "Time's up!"
+Options = Struct.new(:snooze, :message)
 
 options = Options.new
 options.snooze = DEFAULT_SNOOZE
+options.message = DEFAULT_MESSAGE
 
 OptionParser.new do |opts|
   opts.banner = "Usage: #{File.basename($0)} [options] HH:MM"
 
-  opts.on("-s", "--snooze SEC (default = #{DEFAULT_SNOOZE})", Float) do |s|
+  opts.on("-s", "--snooze SEC (default=#{DEFAULT_SNOOZE})", Float) do |s|
     options.snooze = s
+  end
+
+  opts.on('-m', "--message MESSAGE", String) do |msg|
+    options.message = msg
   end
 end.parse!
 
@@ -43,7 +49,7 @@ if start > target
   target += 1*60**2*24
 end
 
-puts "Will wake up at: #{target}\n\n"
+puts "Will trigger on: #{target}\n\n"
 PADDING = ' ' * 30
 
 loop do
@@ -54,7 +60,7 @@ loop do
 
   if overdue > 0
     print "[\033[1;31mOVERDUE\033[0;m] #{humanize(overdue)} (#{Integer(overdue)}s)#{PADDING}\r"
-    system(%Q^espeak "Time to wake up! It's #{now.hour} hours and #{now.min} minutes" 2>/dev/null^)
+    system(%Q^espeak "#{options.message} It's #{now.hour} hours and #{now.min} minutes" 2>/dev/null^)
 
     remaining_snooze = options.snooze
     loop do
